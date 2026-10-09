@@ -11,5 +11,10 @@ Quality assessment of proteomic data for Quartet Project.
 \author{
 \strong{Maintainer}: Qiaochu Chen \email{chenqiaochu@sjtu.edu.cn}
 
+Authors:
+\itemize{
+  \item Qiaochu Chen \email{chenqiaochu@sjtu.edu.cn}
+}
+
 }
 \keyword{internal}
