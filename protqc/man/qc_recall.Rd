@@ -2,7 +2,7 @@
 % Please edit documentation in R/qc_metrics.R
 \name{qc_recall}
 \alias{qc_recall}
-\title{Calculating Recall of nominal characteristics}
+\title{Calculating Recall}
 \usage{
 qc_recall(expr_dt, meta_dt)
 }
@@ -12,5 +12,9 @@ qc_recall(expr_dt, meta_dt)
 \item{meta_dt}{A metadata file (to map library to sample type)}
 }
 \description{
-Calculating Recall of nominal characteristics
+Uses the supplied text's majority-replicate micro Recall.
+A reference peptide must be detected in floor(n / 2) + 1 replicates.
+Overall Recall is total detected reference peptide-sample pairs divided
+by total reference peptide-sample pairs for the sample groups present.
+Reference pairs are deduplicated; missing expression peptides count as undetected.
 }

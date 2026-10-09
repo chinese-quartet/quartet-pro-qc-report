@@ -17,7 +17,7 @@ qc_linear_norm <- function(x, x_min, x_max, decreasing = F) {
   } else {
     x_norm <- sapply(x, function(a) 10 - (a - x_min) * 9 / (x_max - x_min))
   }
-
+  
   return(x_norm <- round(x_norm, digits = 3))
 }
 
@@ -39,7 +39,7 @@ qc_performance <- function(x, x_ref, cutoff = c(0, 0.2, 0.5, 0.8, 1)) {
   } else if (between(x, ref_perc[4], ref_perc[5])) {
     x_class <- "Great"
   }
-
+  
   return(x_class)
 }
 
@@ -51,7 +51,7 @@ qc_rank <- function(x, x_hist) {
   x_all <- c(x, x_hist[!is.na(x_hist)])
   x_pos <- floor(rank(-x_all)[1])
   x_rank <- c(paste(x_pos, "/", length(x_all), sep = ""))
-
+  
   return(x_rank)
 }
 
@@ -66,7 +66,7 @@ qc_allmetrics <- function(pro_dt, meta_dt, pep_dt = NULL,
                           output_dir = NULL, plot = TRUE) {
   # Basic information ---------------------------
   pro_info <- qc_info(pro_dt, meta_dt)
-
+  
   # SNR -----------------------------------------
   snr_results <- qc_snr(pro_dt, meta_dt, output_dir, plot)
   snr_value <- snr_results$SNR
@@ -78,7 +78,7 @@ qc_allmetrics <- function(pro_dt, meta_dt, pep_dt = NULL,
     recall_value <- NA
   }
   
-  # 4. RC (自动使用内置 reference_dataset_quant)
+  # 4. PCC (自动使用内置 reference_dataset_quant)
   if (!is.null(pep_dt)) {
     cor_results <- qc_cor(pep_dt, meta_dt, output_dir, plot)
     cor_value <- cor_results$COR
@@ -86,7 +86,7 @@ qc_allmetrics <- function(pro_dt, meta_dt, pep_dt = NULL,
     cor_results <- NULL
     cor_value <- NA
   }
-
+  
   # QC results ----------------------------------
   metrics <- c(
     "Number of features",
@@ -95,17 +95,17 @@ qc_allmetrics <- function(pro_dt, meta_dt, pep_dt = NULL,
     "Coefficient of variantion (CV, %)",
     "Recall",
     "Signal-to-Noise Ratio (SNR)",
-    "Relative Correlation with Reference Datasets (RC)"
+    "PCC"
   )
   # qc_values <- c(pro_info, snr_value, cor_value)
   qc_values <- c(pro_info, recall_value, snr_value, cor_value)
-
+  
   # Output --------------------------------------
   output_table <- data.table(
     "Quality Metrics" = metrics,
     "Value" = qc_values
   )
-
+  
   all_results <- list(
     snr_results = snr_results,
     cor_results = cor_results,
@@ -124,6 +124,23 @@ qc_allmetrics <- function(pro_dt, meta_dt, pep_dt = NULL,
 #' @export
 qc_total <- function(allmetrics_dt,
                      ref_qc, ref_qc_norm, ref_qc_stat, normalized = T) {
+  # Only align metric names; this does not recompute historical baselines.
+  legacy_pcc_name <- "Relative Correlation with Reference Datasets (RC)"
+  ref_qc <- as.data.frame(ref_qc, check.names = FALSE)
+  ref_qc_norm <- as.data.frame(ref_qc_norm, check.names = FALSE)
+  ref_qc_stat <- as.data.frame(ref_qc_stat, check.names = FALSE)
+  if (!"PCC" %in% names(ref_qc)) {
+    names(ref_qc)[names(ref_qc) == legacy_pcc_name] <- "PCC"
+  }
+  if (!"PCC" %in% names(ref_qc_norm)) {
+    names(ref_qc_norm)[names(ref_qc_norm) == legacy_pcc_name] <- "PCC"
+  }
+  if (!"PCC" %in% ref_qc_stat$`Quality Metrics`) {
+    idx <- which(ref_qc_stat$`Quality Metrics` == legacy_pcc_name)
+    ref_qc_stat$`Quality Metrics` <- as.character(ref_qc_stat$`Quality Metrics`)
+    ref_qc_stat$`Quality Metrics`[idx] <- "PCC"
+  }
+  
   # Normalize & Rank: All metrics ----------------------
   output_class <- c()
   output_norm <- c()
@@ -131,11 +148,11 @@ qc_total <- function(allmetrics_dt,
   metrics <- allmetrics_dt$`Quality Metrics`
   for (m in metrics) {
     x <- allmetrics_dt$Value[allmetrics_dt$`Quality Metrics` %in% m]
-
+    
     # --- 修改开始：增加检查，看该指标是否存在于历史数据中 ---
     # 检查 m 是否在 ref_qc 的列名中
     if (m %in% colnames(ref_qc)) {
-      # 如果历史数据里有这个指标 (比如 SNR, RC)，正常计算
+      # 如果历史数据里有这个指标 (比如 SNR, PCC)，正常计算
       x_ref_norm <- as.numeric(ref_qc_norm[, colnames(ref_qc_norm) %in% m])
       x_ref <- ref_qc[, colnames(ref_qc) %in% m]
       
@@ -165,12 +182,12 @@ qc_total <- function(allmetrics_dt,
       x_class <- "-"  # 无法评级 (Bad/Good)
     }
     # --- 修改结束 ---
-
+    
     output_norm <- c(output_norm, x_norm)
     output_rank <- c(output_rank, x_rank)
     output_class <- c(output_class, x_class)
   }
-
+  
   # Normalize & Rank: Total score ----------------------
   # 计算 Total Score 时，需要排除掉那些没有归一化值的指标 (Recall)
   valid_norms <- as.numeric(output_norm[!is.na(output_norm)])
@@ -185,11 +202,11 @@ qc_total <- function(allmetrics_dt,
     total_value <- 0
     total_norm <- 0
   }
-
+  
   total_ref_norm <- as.numeric(ref_qc_norm$Total_norm)
   total_rank <- qc_rank(total_norm, total_ref_norm)
   total_c <- qc_performance(total_norm, total_ref_norm)
-
+  
   # Output ---------------------------------------------
   allmetrics <- c(metrics, "Total", "Total_norm")
   allnorm_dt <- data.table(
